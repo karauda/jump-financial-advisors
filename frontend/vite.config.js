@@ -5,7 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: {
+    // Proxy only for development
+    proxy: process.env.NODE_ENV !== 'production' ? {
       // Only proxy OAuth endpoints to backend, not /auth/success
       '^/auth/(google|hubspot|status|logout)': {
         target: 'http://localhost:3001',
@@ -15,6 +16,6 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-    },
+    } : undefined,
   },
 });
