@@ -1,18 +1,12 @@
 services:
-  # PostgreSQL Database with pgvector
-  - type: postgres
-    name: financial-advisor-db
-    plan: starter
-    databaseName: financial_advisor_ai
-    user: postgres
-    postgresMajorVersion: 16
-
-  # Redis (native Render service)
-  - type: redis
+  # Redis Key-Value Store
+  - type: keyvalue
     name: financial-advisor-redis
     plan: starter
     maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
 
   # Backend API
   - type: web
@@ -32,7 +26,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: financial-advisor-redis
-          type: redis
+          type: keyvalue
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
@@ -53,7 +47,7 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-  # Frontend
+  # Frontend Static Site
   - type: web
     name: financial-advisor-frontend
     env: static
@@ -66,3 +60,14 @@ services:
     envVars:
       - key: VITE_API_URL
         sync: false
+
+# PostgreSQL Database
+databases:
+  - name: financial-advisor-db
+    databaseName: financial_advisor_ai
+    user: postgres
+    plan: starter
+    postgresMajorVersion: '16'
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
