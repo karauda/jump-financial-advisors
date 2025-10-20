@@ -65,7 +65,7 @@ services:
 databases:
   - name: financial-advisor-db
     databaseName: financial_advisor_ai
-    plan: starter
+    plan: basic-256mb
     postgresMajorVersion: '16'
     ipAllowList:
       - source: 0.0.0.0/0
