@@ -65,7 +65,6 @@ services:
 databases:
   - name: financial-advisor-db
     databaseName: financial_advisor_ai
-    user: postgres
     plan: starter
     postgresMajorVersion: '16'
     ipAllowList:
