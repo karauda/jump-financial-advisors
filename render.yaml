@@ -1,17 +1,11 @@
 services:
-  # PostgreSQL Database
-  - type: pserv
+  # PostgreSQL Database with pgvector
+  - type: postgres
     name: financial-advisor-db
-    env: docker
     plan: starter
-    dockerfilePath: ./Dockerfile.postgres
-    envVars:
-      - key: POSTGRES_USER
-        value: postgres
-      - key: POSTGRES_PASSWORD
-        generateValue: true
-      - key: POSTGRES_DB
-        value: financial_advisor_ai
+    databaseName: financial_advisor_ai
+    user: postgres
+    postgresMajorVersion: 16
 
   # Redis (native Render service)
   - type: redis
