@@ -1,0 +1,4 @@
+FROM pgvector/pgvector:pg16
+
+# The pgvector image already has PostgreSQL and the vector extension
+# This Dockerfile is just to ensure we use the correct image on Render
