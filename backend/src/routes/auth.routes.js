@@ -10,7 +10,10 @@ router.get('/google', passport.authenticate('google'));
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', { 
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`,
+    session: true
+  }),
   (req, res) => {
     // Redirect to frontend with success
     res.redirect(`${process.env.FRONTEND_URL}/auth/success`);
