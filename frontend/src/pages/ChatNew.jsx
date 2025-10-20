@@ -128,7 +128,8 @@ export default function ChatNew({ user, onLogout }) {
   };
 
   const handleConnectHubSpot = () => {
-    window.location.href = '/auth/hubspot';
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    window.location.href = `${apiUrl}/auth/hubspot`;
   };
 
   const handleLogout = async () => {
