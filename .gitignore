@@ -40,5 +40,7 @@ Thumbs.db
 tmp/
 temp/
 
-# Development documentation (not for public repo)
+# Development documentation (local reference only)
 docs/
+FEATURES.md
+SUBMISSION.md

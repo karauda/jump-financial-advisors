@@ -13,13 +13,12 @@ services:
       - key: POSTGRES_DB
         value: financial_advisor_ai
 
-  # Redis
-  - type: pserv
+  # Redis (native Render service)
+  - type: redis
     name: financial-advisor-redis
-    env: docker
     plan: starter
-    image:
-      url: redis:7-alpine
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
   # Backend API
   - type: web
@@ -40,7 +39,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: financial-advisor-redis
-          type: pserv
+          type: redis
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
@@ -74,7 +73,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: financial-advisor-backend
-          type: web
-          property: host
+        value: https://financial-advisor-backend.onrender.com
