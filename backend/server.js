@@ -78,11 +78,18 @@ async function startServer() {
 
     // Start proactive polling (every 5 minutes)
     const pollingInterval = parseInt(process.env.POLLING_INTERVAL || '5');
+    
+    // Run immediately on startup
+    setTimeout(() => {
+      pollForProactiveActions().catch(console.error);
+    }, 30000); // Run after 30 seconds
+    
+    // Then run on interval
     setInterval(() => {
       pollForProactiveActions().catch(console.error);
     }, pollingInterval * 60 * 1000);
 
-    console.log(`✓ Proactive polling enabled (every ${pollingInterval} minutes)\n`);
+    console.log(`✓ Proactive polling enabled (every ${pollingInterval} minutes, first run in 30 seconds)\n`);
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

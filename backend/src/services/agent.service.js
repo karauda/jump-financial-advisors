@@ -322,10 +322,35 @@ async function executeToolCall(toolName, args, user) {
         }
 
         const event = await calendarService.createEvent(googleTokens, eventData);
+        
+        // Store in database for proactive agent to detect
+        await pool.query(
+          `INSERT INTO calendar_events 
+           (user_id, event_id, summary, description, start_time, end_time, attendees)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (event_id) DO UPDATE SET
+             summary = EXCLUDED.summary,
+             description = EXCLUDED.description,
+             start_time = EXCLUDED.start_time,
+             end_time = EXCLUDED.end_time,
+             attendees = EXCLUDED.attendees,
+             updated_at = CURRENT_TIMESTAMP`,
+          [
+            user.id,
+            event.id,
+            event.summary,
+            event.description || null,
+            event.start.dateTime,
+            event.end.dateTime,
+            JSON.stringify(event.attendees || [])
+          ]
+        );
+        
         return {
           success: true,
           eventId: event.id,
           htmlLink: event.htmlLink,
+          message: `Calendar event created: ${event.summary}`,
         };
       }
 
@@ -351,10 +376,17 @@ async function executeToolCall(toolName, args, user) {
           return { error: 'HubSpot not connected' };
         }
         const contact = await hubspotService.createContact(hubspotToken, args);
+        
+        // Store in database for proactive agent to detect
+        const { storeHubSpotContact } = require('./rag.service');
+        await storeHubSpotContact(user.id, contact);
+        
         return {
           success: true,
           contactId: contact.id,
           email: contact.properties.email,
+          name: `${contact.properties.firstname || ''} ${contact.properties.lastname || ''}`.trim(),
+          message: `HubSpot contact created: ${contact.properties.firstname} ${contact.properties.lastname}`,
         };
       }
 
@@ -475,21 +507,27 @@ async function runAgent(userId, conversationId, userMessage) {
     // Build system message
     let systemMessage = `You are an AI assistant for a financial advisor. You help manage client communications, schedule meetings, and maintain client information.
 
-You have access to:
-- Gmail for reading and sending emails
-- Google Calendar for scheduling and checking availability
-- HubSpot CRM for managing contacts and notes
+You have access to the following tools - USE THEM ACTIVELY:
+- search_knowledge_base: Search emails, HubSpot contacts, and notes
+- send_email: Send emails via Gmail
+- get_available_times: Check calendar availability
+- create_calendar_event: Create calendar events (USE THIS when scheduling meetings!)
+- search_hubspot_contacts: Search HubSpot CRM
+- create_hubspot_contact: Create new contacts
+- add_hubspot_note: Add notes to contacts
+- search_emails: Search Gmail
+- get_upcoming_events: List upcoming calendar events
+- create_task: Store tasks for later
 
 Current date and time: ${new Date().toISOString()}
 
-When users ask you to schedule meetings:
-1. Search for the contact to get their email
-2. Get available time slots from the calendar
-3. Send an email proposing 3-5 available times
-4. When they reply with their choice, create the calendar event
-5. Confirm with them and add a note to HubSpot
-
-Be proactive and helpful. When you need more information, ask clarifying questions.`;
+IMPORTANT GUIDELINES:
+- When asked to schedule a meeting, you MUST create the calendar event using create_calendar_event tool
+- When asked to create a contact, you MUST use create_hubspot_contact tool
+- When asked to send an email, you MUST use send_email tool
+- Always search knowledge base first when asked questions about clients
+- Be proactive - take action without asking for confirmation unless truly necessary
+- When you see ongoing instructions below, EXECUTE THEM when relevant triggers occur`;
 
     if (ongoingInstructions.length > 0) {
       systemMessage += `\n\nOngoing instructions you should follow:\n${ongoingInstructions

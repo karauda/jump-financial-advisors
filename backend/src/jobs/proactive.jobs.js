@@ -111,6 +111,178 @@ Based on your ongoing instructions, should you take any action? If so, proceed w
   }
 }
 
+// Check for new HubSpot contacts and trigger proactive actions
+async function checkForNewHubSpotContacts(userId) {
+  console.log(`Checking for new HubSpot contacts for user ${userId}`);
+
+  try {
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+
+    if (!user || !user.hubspot_tokens) {
+      return;
+    }
+
+    // Get ongoing instructions
+    const instructionsResult = await pool.query(
+      'SELECT instruction FROM ongoing_instructions WHERE user_id = $1 AND is_active = true',
+      [userId]
+    );
+
+    if (instructionsResult.rows.length === 0) {
+      return;
+    }
+
+    // Get recently created contacts (within last 10 minutes)
+    const recentContactsResult = await pool.query(
+      `SELECT * FROM hubspot_contacts 
+       WHERE user_id = $1 AND created_at > NOW() - INTERVAL '10 minutes'
+       ORDER BY created_at DESC LIMIT 5`,
+      [userId]
+    );
+
+    const newContacts = recentContactsResult.rows;
+
+    if (newContacts.length === 0) {
+      return;
+    }
+
+    console.log(`Found ${newContacts.length} new HubSpot contacts`);
+
+    // Get or create proactive conversation
+    let conversationResult = await pool.query(
+      `SELECT id FROM conversations
+       WHERE user_id = $1 AND title = 'Proactive Actions'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    let conversationId;
+    if (conversationResult.rows.length === 0) {
+      conversationResult = await pool.query(
+        `INSERT INTO conversations (user_id, title)
+         VALUES ($1, 'Proactive Actions')
+         RETURNING id`,
+        [userId]
+      );
+      conversationId = conversationResult.rows[0].id;
+    } else {
+      conversationId = conversationResult.rows[0].id;
+    }
+
+    // Process each new contact
+    for (const contact of newContacts) {
+      try {
+        const prompt = `
+New HubSpot contact was created:
+Name: ${contact.first_name} ${contact.last_name}
+Email: ${contact.email}
+Company: ${contact.company || 'N/A'}
+
+Based on your ongoing instructions, should you take any action? If so, proceed with the appropriate actions.
+        `.trim();
+
+        const response = await runAgent(userId, conversationId, prompt);
+        
+        if (response.content && !response.content.includes('No action needed')) {
+          console.log(`Proactive action taken for new contact: ${contact.email}`);
+        }
+      } catch (error) {
+        console.error(`Error processing new contact ${contact.contact_id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error(`Error checking for new HubSpot contacts for user ${userId}:`, error);
+  }
+}
+
+// Check for new calendar events and trigger proactive actions
+async function checkForNewCalendarEvents(userId) {
+  console.log(`Checking for new calendar events for user ${userId}`);
+
+  try {
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
+
+    if (!user || !user.google_tokens) {
+      return;
+    }
+
+    // Get ongoing instructions
+    const instructionsResult = await pool.query(
+      'SELECT instruction FROM ongoing_instructions WHERE user_id = $1 AND is_active = true',
+      [userId]
+    );
+
+    if (instructionsResult.rows.length === 0) {
+      return;
+    }
+
+    // Get recently created events (within last 10 minutes)
+    const recentEventsResult = await pool.query(
+      `SELECT * FROM calendar_events 
+       WHERE user_id = $1 AND created_at > NOW() - INTERVAL '10 minutes'
+       ORDER BY created_at DESC LIMIT 5`,
+      [userId]
+    );
+
+    const newEvents = recentEventsResult.rows;
+
+    if (newEvents.length === 0) {
+      return;
+    }
+
+    console.log(`Found ${newEvents.length} new calendar events`);
+
+    // Get or create proactive conversation
+    let conversationResult = await pool.query(
+      `SELECT id FROM conversations
+       WHERE user_id = $1 AND title = 'Proactive Actions'
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    );
+
+    let conversationId;
+    if (conversationResult.rows.length === 0) {
+      conversationResult = await pool.query(
+        `INSERT INTO conversations (user_id, title)
+         VALUES ($1, 'Proactive Actions')
+         RETURNING id`,
+        [userId]
+      );
+      conversationId = conversationResult.rows[0].id;
+    } else {
+      conversationId = conversationResult.rows[0].id;
+    }
+
+    // Process each new event
+    for (const event of newEvents) {
+      try {
+        const attendees = event.attendees ? JSON.parse(event.attendees) : [];
+        const prompt = `
+New calendar event was created:
+Summary: ${event.summary}
+Start: ${event.start_time}
+End: ${event.end_time}
+Attendees: ${attendees.map(a => a.email).join(', ') || 'None'}
+
+Based on your ongoing instructions, should you take any action? If so, proceed with the appropriate actions.
+        `.trim();
+
+        const response = await runAgent(userId, conversationId, prompt);
+        
+        if (response.content && !response.content.includes('No action needed')) {
+          console.log(`Proactive action taken for new event: ${event.summary}`);
+        }
+      } catch (error) {
+        console.error(`Error processing new event ${event.event_id}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error(`Error checking for new calendar events for user ${userId}:`, error);
+  }
+}
+
 // Poll for all active users
 async function pollForProactiveActions() {
   try {
@@ -124,6 +296,8 @@ async function pollForProactiveActions() {
     for (const user of usersResult.rows) {
       try {
         await checkForNewEmails(user.id);
+        await checkForNewHubSpotContacts(user.id);
+        await checkForNewCalendarEvents(user.id);
       } catch (error) {
         console.error(`Error polling user ${user.id}:`, error);
       }
@@ -135,5 +309,7 @@ async function pollForProactiveActions() {
 
 module.exports = {
   checkForNewEmails,
+  checkForNewHubSpotContacts,
+  checkForNewCalendarEvents,
   pollForProactiveActions,
 };
